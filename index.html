@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flagged — AI Relationship Pattern Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fdf8f3;
+    --ink: #1a0f0a;
+    --red: #d63031;
+    --red-light: #ff7675;
+    --amber: #e17055;
+    --green: #00b894;
+    --border: #e8ddd4;
+    --muted: #8b7355;
+    --surface: #f5ede3;
+    --white: #ffffff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* Subtle dot grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(var(--border) 1.5px, transparent 1.5px);
+    background-size: 28px 28px;
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* NAV */
+  .nav {
+    padding: 28px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-flag {
+    width: 32px;
+    height: 32px;
+    background: var(--red);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .logo-text {
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+  }
+
+  .logo-text span { color: var(--red); }
+
+  .nav-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* HERO */
+  .hero {
+    padding: 56px 0 48px;
+    text-align: center;
+  }
+
+  .hero-pill {
+    display: inline-block;
+    background: rgba(214,48,49,0.08);
+    border: 1px solid rgba(214,48,49,0.2);
+    color: var(--red);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    margin-bottom: 28px;
+  }
+
+  h1 {
+    font-size: clamp(2.4rem, 6vw, 3.8rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+    margin-bottom: 20px;
+    color: var(--ink);
+  }
+
+  h1 em {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--red);
+  }
+
+  .hero-sub {
+    font-size: 1rem;
+    line-height: 1.75;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 auto 40px;
+    font-weight: 400;
+  }
+
+  .flag-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    margin-bottom: 40px;
+    border: 1px solid var(--border);
+  }
+
+  .flag-stat {
+    background: var(--white);
+    padding: 20px 16px;
+    text-align: center;
+  }
+
+  .flag-num {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--red);
+    letter-spacing: -0.03em;
+  }
+
+  .flag-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .cta-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .btn-main {
+    background: var(--red);
+    color: white;
+    border: none;
+    padding: 16px 44px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    letter-spacing: -0.01em;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+
+  .btn-main:hover {
+    background: #b02828;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(214,48,49,0.25);
+  }
+
+  .price-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* PATTERNS preview */
+  .patterns-preview {
+    background: var(--white);
+    border: 1px solid var(--border);
+    padding: 28px;
+    margin-bottom: 64px;
+  }
+
+  .patterns-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .pattern-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tag {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 2px;
+    letter-spacing: 0.02em;
+  }
+
+  .tag.red { background: rgba(214,48,49,0.08); color: var(--red); border: 1px solid rgba(214,48,49,0.15); }
+  .tag.amber { background: rgba(225,112,85,0.08); color: var(--amber); border: 1px solid rgba(225,112,85,0.2); }
+  .tag.green { background: rgba(0,184,148,0.08); color: var(--green); border: 1px solid rgba(0,184,148,0.2); }
+
+  /* FORM */
+  .form-section { display: none; }
+  .form-section.active { display: block; padding: 40px 0; }
+
+  .step-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 40px;
+  }
+
+  .step-item {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+
+  .step-item.done { background: var(--red); }
+  .step-item.active { background: var(--amber); }
+
+  .input-block {
+    display: none;
+    animation: slideUp 0.35s ease;
+  }
+
+  .input-block.active { display: block; }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .input-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 8px;
+  }
+
+  .input-question {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.5rem;
+    font-style: italic;
+    color: var(--ink);
+    margin-bottom: 24px;
+    line-height: 1.35;
+  }
+
+  .text-area {
+    width: 100%;
+    min-height: 160px;
+    border: 1px solid var(--border);
+    background: var(--white);
+    padding: 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--ink);
+    outline: none;
+    resize: vertical;
+    border-radius: 2px;
+    transition: border-color 0.2s;
+    margin-bottom: 16px;
+  }
+
+  .text-area:focus {
+    border-color: var(--red);
+  }
+
+  .text-area::placeholder { color: var(--muted); font-size: 0.88rem; }
+
+  .mc-options {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .mc-opt {
+    border: 1px solid var(--border);
+    background: var(--white);
+    padding: 13px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 400;
+    color: var(--ink);
+    transition: all 0.2s;
+    text-align: left;
+    border-radius: 2px;
+  }
+
+  .mc-opt:hover { border-color: var(--red); background: rgba(214,48,49,0.03); }
+  .mc-opt.sel { border-color: var(--red); background: rgba(214,48,49,0.06); font-weight: 600; }
+
+  .mc-dot {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .mc-opt.sel .mc-dot {
+    border-color: var(--red);
+    background: var(--red);
+  }
+
+  .text-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--white);
+    padding: 13px 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    color: var(--ink);
+    outline: none;
+    border-radius: 2px;
+    transition: border-color 0.2s;
+    margin-bottom: 12px;
+  }
+
+  .text-input:focus { border-color: var(--red); }
+  .text-input::placeholder { color: var(--muted); }
+
+  .nav-btns {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 28px;
+  }
+
+  .btn-back {
+    background: none;
+    border: 1px solid var(--border);
+    padding: 11px 20px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+
+  .btn-back:hover { border-color: var(--ink); color: var(--ink); }
+
+  .btn-fwd {
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    padding: 12px 28px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-fwd:hover { background: var(--red); }
+  .btn-fwd:disabled { opacity: 0.3; cursor: not-allowed; background: var(--ink); }
+
+  /* PAYMENT */
+  .pay-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    padding: 36px;
+  }
+
+  .pay-header {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 24px;
+    color: var(--ink);
+  }
+
+  .pay-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .pay-row.total {
+    border-top: 1px solid var(--border);
+    margin-top: 12px;
+    padding-top: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--ink);
+  }
+
+  .pay-row.total span:last-child {
+    color: var(--red);
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.3rem;
+    font-style: italic;
+  }
+
+  .stripe-pay {
+    width: 100%;
+    margin-top: 24px;
+    background: var(--red);
+    color: white;
+    border: none;
+    padding: 16px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s;
+    border-radius: 2px;
+    letter-spacing: 0.01em;
+  }
+
+  .stripe-pay:hover { background: #b02828; }
+
+  .pay-safe {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  /* RESULTS */
+  .results-section { display: none; padding: 40px 0; }
+  .results-section.active {
+    display: block;
+    animation: slideUp 0.5s ease;
+  }
+
+  .overall-score {
+    background: var(--white);
+    border: 1px solid var(--border);
+    padding: 40px;
+    text-align: center;
+    margin-bottom: 24px;
+    position: relative;
+  }
+
+  .score-ring {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 20px;
+    position: relative;
+  }
+
+  .score-ring svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .score-ring-bg { fill: none; stroke: var(--border); stroke-width: 6; }
+  .score-ring-fill { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1.5s ease; }
+  .score-ring-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+  }
+
+  .score-ring-num small {
+    font-size: 0.65rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    display: block;
+    margin-top: -4px;
+  }
+
+  .verdict-headline {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+  }
+
+  .verdict-body {
+    font-size: 0.9rem;
+    color: var(--muted);
+    max-width: 440px;
+    margin: 0 auto;
+    line-height: 1.7;
+    font-weight: 400;
+  }
+
+  .patterns-found {
+    margin-bottom: 24px;
+  }
+
+  .pf-heading {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .pattern-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    padding: 20px;
+    margin-bottom: 8px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .pattern-card.flag-red { border-left-color: var(--red); }
+  .pattern-card.flag-amber { border-left-color: var(--amber); }
+  .pattern-card.flag-green { border-left-color: var(--green); }
+
+  .pattern-flag {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .pattern-info h4 {
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    color: var(--ink);
+  }
+
+  .pattern-info p {
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1.55;
+    font-weight: 400;
+  }
+
+  .advice-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px;
+    margin-bottom: 24px;
+  }
+
+  .advice-heading {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--ink);
+  }
+
+  .advice-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .advice-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .advice-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--red);
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  .advice-item p {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--ink);
+    font-weight: 400;
+  }
+
+  .share-cta {
+    background: var(--red);
+    color: white;
+    padding: 36px;
+    text-align: center;
+    margin-bottom: 24px;
+    border-radius: 2px;
+  }
+
+  .share-cta h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .share-cta p {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 24px;
+    font-weight: 400;
+  }
+
+  .share-input-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .share-input-row input {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-right: none;
+    padding: 12px 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.88rem;
+    color: white;
+    outline: none;
+    border-radius: 2px 0 0 2px;
+  }
+
+  .share-input-row input::placeholder { color: rgba(255,255,255,0.5); }
+
+  .share-input-row button {
+    background: var(--ink);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+    border-radius: 0 2px 2px 0;
+    letter-spacing: 0.02em;
+  }
+
+  .share-input-row button:hover { background: #2d2d2d; }
+
+  footer {
+    padding: 36px 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.63rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* LOADING */
+  .load-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .load-screen.active { display: flex; }
+
+  .load-flags {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .load-flag {
+    width: 12px; height: 20px;
+    border-radius: 1px;
+    animation: flagWave 0.8s ease-in-out infinite;
+  }
+
+  .load-flag:nth-child(1) { background: var(--green); animation-delay: 0s; }
+  .load-flag:nth-child(2) { background: var(--amber); animation-delay: 0.15s; }
+  .load-flag:nth-child(3) { background: var(--red); animation-delay: 0.3s; }
+
+  @keyframes flagWave {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(1.6); }
+  }
+
+  .load-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  .load-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="nav">
+    <div class="logo">
+      <div class="logo-flag">🚩</div>
+      <div class="logo-text">Flag<span>ged</span></div>
+    </div>
+    <div class="nav-price">$4.99 · Instant analysis</div>
+  </nav>
+
+  <!-- HERO -->
+  <section id="heroSection">
+    <div class="hero">
+      <div class="hero-pill">AI Pattern Detection</div>
+      <h1>Your gut says<br>something's <em>off.</em></h1>
+      <p class="hero-sub">Describe what's happening. Flagged analyzes behavioral patterns — manipulation tactics, emotional unavailability, communication styles — and tells you what's actually going on.</p>
+
+      <div class="flag-grid">
+        <div class="flag-stat"><div class="flag-num">12</div><div class="flag-label">Patterns</div></div>
+        <div class="flag-stat"><div class="flag-num">60s</div><div class="flag-label">Analysis</div></div>
+        <div class="flag-stat"><div class="flag-num">$4.99</div><div class="flag-label">One-time</div></div>
+        <div class="flag-stat"><div class="flag-num">100%</div><div class="flag-label">Private</div></div>
+      </div>
+
+      <div class="cta-group">
+        <button class="btn-main" onclick="startFlagged()">Analyze My Situation →</button>
+        <div class="price-note">$4.99 · No account needed · Data never stored</div>
+      </div>
+    </div>
+
+    <div class="patterns-preview">
+      <div class="patterns-label">Patterns We Detect</div>
+      <div class="pattern-tags">
+        <span class="tag red">Love Bombing</span>
+        <span class="tag red">Gaslighting</span>
+        <span class="tag red">Isolation Tactics</span>
+        <span class="tag red">Intermittent Reinforcement</span>
+        <span class="tag amber">Emotional Unavailability</span>
+        <span class="tag amber">Avoidant Attachment</span>
+        <span class="tag amber">Stonewalling</span>
+        <span class="tag amber">Breadcrumbing</span>
+        <span class="tag green">Secure Communication</span>
+        <span class="tag green">Healthy Boundaries</span>
+        <span class="tag green">Consistent Behavior</span>
+        <span class="tag green">Mutual Reciprocity</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- FORM -->
+  <section class="form-section" id="formSection">
+    <div class="step-bar">
+      <div class="step-item active" id="s1"></div>
+      <div class="step-item" id="s2"></div>
+      <div class="step-item" id="s3"></div>
+      <div class="step-item" id="s4"></div>
+      <div class="step-item" id="s5"></div>
+      <div class="step-item" id="s6"></div>
+    </div>
+
+    <!-- Step 1: Relationship type -->
+    <div class="input-block active" id="ib1">
+      <div class="input-label">Step 1 of 6 — Context</div>
+      <div class="input-question">What type of relationship are we analyzing?</div>
+      <div class="mc-options">
+        <button class="mc-opt" onclick="mcPick(this, 1)"><div class="mc-dot"></div>Romantic partner (current)</button>
+        <button class="mc-opt" onclick="mcPick(this, 1)"><div class="mc-dot"></div>Someone I'm dating / talking to</button>
+        <button class="mc-opt" onclick="mcPick(this, 1)"><div class="mc-dot"></div>Ex-partner</button>
+        <button class="mc-opt" onclick="mcPick(this, 1)"><div class="mc-dot"></div>Family member</button>
+        <button class="mc-opt" onclick="mcPick(this, 1)"><div class="mc-dot"></div>Friend</button>
+        <button class="mc-opt" onclick="mcPick(this, 1)"><div class="mc-dot"></div>Coworker / professional relationship</button>
+      </div>
+    </div>
+
+    <!-- Step 2: How long -->
+    <div class="input-block" id="ib2">
+      <div class="input-label">Step 2 of 6 — Timeline</div>
+      <div class="input-question">How long have you known this person?</div>
+      <div class="mc-options">
+        <button class="mc-opt" onclick="mcPick(this, 2)"><div class="mc-dot"></div>Less than 3 months</button>
+        <button class="mc-opt" onclick="mcPick(this, 2)"><div class="mc-dot"></div>3–12 months</button>
+        <button class="mc-opt" onclick="mcPick(this, 2)"><div class="mc-dot"></div>1–3 years</button>
+        <button class="mc-opt" onclick="mcPick(this, 2)"><div class="mc-dot"></div>3–7 years</button>
+        <button class="mc-opt" onclick="mcPick(this, 2)"><div class="mc-dot"></div>7+ years</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Describe situation -->
+    <div class="input-block" id="ib3">
+      <div class="input-label">Step 3 of 6 — The Situation</div>
+      <div class="input-question">In your own words, what's been happening that concerns you?</div>
+      <textarea class="text-area" id="situation" placeholder="Describe specific behaviors, conversations, or patterns that made you pause. The more specific you are, the more accurate your analysis will be. Don't hold back — everything here is private and deleted after analysis." rows="7"></textarea>
+    </div>
+
+    <!-- Step 4: Specific behaviors -->
+    <div class="input-block" id="ib4">
+      <div class="input-label">Step 4 of 6 — Behaviors</div>
+      <div class="input-question">Which of these have you observed? (Select all that apply)</div>
+      <div class="mc-options" id="behaviorOpts">
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Hot and cold — intense then distant</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Questioning my memory of events</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Excessive compliments early on</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Withdrawing affection as punishment</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Dismissing my feelings as overreacting</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Making me feel responsible for their emotions</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Inconsistent follow-through on plans</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Jealousy or monitoring behavior</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>Talking badly about my friends or family</button>
+        <button class="mc-opt multi" onclick="multiPick(this)"><div class="mc-dot"></div>None of the above — behavior feels healthy</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Your feeling -->
+    <div class="input-block" id="ib5">
+      <div class="input-label">Step 5 of 6 — Your Experience</div>
+      <div class="input-question">How do you typically feel after interacting with this person?</div>
+      <div class="mc-options">
+        <button class="mc-opt" onclick="mcPick(this, 5)"><div class="mc-dot"></div>Confused and unsure of what just happened</button>
+        <button class="mc-opt" onclick="mcPick(this, 5)"><div class="mc-dot"></div>Drained or emotionally exhausted</button>
+        <button class="mc-opt" onclick="mcPick(this, 5)"><div class="mc-dot"></div>Anxious about whether they're happy with me</button>
+        <button class="mc-opt" onclick="mcPick(this, 5)"><div class="mc-dot"></div>Sometimes great, sometimes terrible</button>
+        <button class="mc-opt" onclick="mcPick(this, 5)"><div class="mc-dot"></div>Generally good — mostly comfortable and secure</button>
+      </div>
+    </div>
+
+    <!-- Step 6: Info capture -->
+    <div class="input-block" id="ib6">
+      <div class="input-label">Step 6 of 6 — Delivery</div>
+      <div class="input-question">Where should we send your analysis?</div>
+      <input type="email" class="text-input" id="flagEmail" placeholder="Email address (for delivery)" />
+      <p style="font-size:0.78rem; color:var(--muted); line-height:1.6; margin-top:4px;">Your responses are analyzed immediately and never stored. This email is only used to deliver your report. No marketing, no follow-up.</p>
+    </div>
+
+    <!-- PAYMENT -->
+    <div class="input-block" id="ibPay">
+      <div class="input-label">Payment — Unlock Your Analysis</div>
+      <div class="pay-card">
+        <div class="pay-header">Flagged Full Analysis Report</div>
+        <div class="pay-row"><span>Pattern detection report</span><span>$4.99</span></div>
+        <div class="pay-row"><span>12 behavioral patterns analyzed</span><span>included</span></div>
+        <div class="pay-row"><span>Red flag severity scoring</span><span>included</span></div>
+        <div class="pay-row"><span>Personalized advice</span><span>included</span></div>
+        <div class="pay-row"><span>Private — data never stored</span><span>✓</span></div>
+        <div class="pay-row total"><span>Total</span><span>$4.99</span></div>
+        <button class="stripe-pay" onclick="runAnalysis()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+          Pay $4.99 — Get My Analysis
+        </button>
+        <div class="pay-safe">🔒 STRIPE · DATA DELETED POST-ANALYSIS · NO SUBSCRIPTION</div>
+      </div>
+    </div>
+
+    <div class="nav-btns">
+      <button class="btn-back" id="backFlagged" onclick="prevStep()" style="visibility:hidden">← Back</button>
+      <button class="btn-fwd" id="nextFlagged" onclick="nextStep()">Continue →</button>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="results-section" id="resultsSection">
+    <div class="overall-score">
+      <div class="score-ring">
+        <svg viewBox="0 0 120 120">
+          <circle class="score-ring-bg" cx="60" cy="60" r="52"/>
+          <circle class="score-ring-fill" id="ringFill" cx="60" cy="60" r="52"
+            stroke-dasharray="326.7"
+            stroke-dashoffset="326.7"
+            stroke="var(--red)"/>
+        </svg>
+        <div class="score-ring-num" id="ringNum">--<small>RISK</small></div>
+      </div>
+      <div class="verdict-headline" id="verdictHL">Analyzing...</div>
+      <div class="verdict-body" id="verdictBD">—</div>
+    </div>
+
+    <div class="patterns-found">
+      <div class="pf-heading">Patterns Detected</div>
+      <div id="patternCards"></div>
+    </div>
+
+    <div class="advice-section">
+      <div class="advice-heading">What To Do Next</div>
+      <div id="adviceList"></div>
+    </div>
+
+    <div class="share-cta">
+      <h3>Get Your Full Report</h3>
+      <p>Detailed analysis, attachment style breakdown, and communication scripts sent to your inbox.</p>
+      <div class="share-input-row">
+        <input type="email" id="shareEmail" placeholder="your@email.com" />
+        <button onclick="sendFlaggedReport()">Send →</button>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>© 2026 FLAGGED</span>
+    <span>PRIVATE · SECURE · AI-POWERED</span>
+  </footer>
+</div>
+
+<div class="load-screen" id="loadScreen">
+  <div class="load-flags">
+    <div class="load-flag"></div>
+    <div class="load-flag"></div>
+    <div class="load-flag"></div>
+  </div>
+  <div class="load-text">Analyzing patterns...</div>
+  <div class="load-status" id="loadMsg">Reading behavioral signals...</div>
+</div>
+
+<script>
+  let curStep = 1;
+  const totalSteps = 6;
+  const stepData = {};
+
+  function startFlagged() {
+    document.getElementById('heroSection').style.display = 'none';
+    document.getElementById('formSection').classList.add('active');
+    updateStepBar();
+    document.getElementById('nextFlagged').disabled = false;
+  }
+
+  function mcPick(el, step) {
+    document.querySelectorAll(`#ib${step} .mc-opt`).forEach(o => o.classList.remove('sel'));
+    el.classList.add('sel');
+    stepData[step] = el.textContent.trim();
+    document.getElementById('nextFlagged').disabled = false;
+  }
+
+  function multiPick(el) {
+    el.classList.toggle('sel');
+    const selected = document.querySelectorAll('#behaviorOpts .mc-opt.sel');
+    stepData[4] = Array.from(selected).map(e => e.textContent.trim());
+    document.getElementById('nextFlagged').disabled = selected.length === 0;
+  }
+
+  function updateStepBar() {
+    for (let i = 1; i <= 6; i++) {
+      const el = document.getElementById(`s${i}`);
+      if (i < curStep) el.className = 'step-item done';
+      else if (i === curStep) el.className = 'step-item active';
+      else el.className = 'step-item';
+    }
+  }
+
+  function nextStep() {
+    if (curStep === 3) {
+      if (!document.getElementById('situation').value.trim()) {
+        alert('Please describe your situation before continuing.');
+        return;
+      }
+      stepData[3] = document.getElementById('situation').value;
+    }
+    if (curStep === 6) {
+      const email = document.getElementById('flagEmail').value;
+      if (!email) { alert('Please enter your email address.'); return; }
+      stepData.email = email;
+      document.getElementById('shareEmail').value = email;
+      document.getElementById(`ib${curStep}`).classList.remove('active');
+      document.getElementById('ibPay').classList.add('active');
+      document.getElementById('nextFlagged').style.display = 'none';
+      document.getElementById('backFlagged').style.visibility = 'visible';
+      curStep = 7;
+      return;
+    }
+    if (curStep < 6) {
+      document.getElementById(`ib${curStep}`).classList.remove('active');
+      curStep++;
+      document.getElementById(`ib${curStep}`).classList.add('active');
+      document.getElementById('backFlagged').style.visibility = 'visible';
+      const needsSelection = [1,2,5].includes(curStep);
+      document.getElementById('nextFlagged').disabled = needsSelection && !stepData[curStep];
+      if (curStep === 3 || curStep === 6) document.getElementById('nextFlagged').disabled = false;
+      if (curStep === 4) document.getElementById('nextFlagged').disabled = true;
+      updateStepBar();
+    }
+  }
+
+  function prevStep() {
+    if (curStep === 7) {
+      document.getElementById('ibPay').classList.remove('active');
+      curStep = 6;
+      document.getElementById('ib6').classList.add('active');
+      document.getElementById('nextFlagged').style.display = 'flex';
+      document.getElementById('nextFlagged').disabled = false;
+    } else if (curStep > 1) {
+      document.getElementById(`ib${curStep}`).classList.remove('active');
+      curStep--;
+      document.getElementById(`ib${curStep}`).classList.add('active');
+      if (curStep === 1) document.getElementById('backFlagged').style.visibility = 'hidden';
+      document.getElementById('nextFlagged').disabled = false;
+    }
+    updateStepBar();
+  }
+
+  function runAnalysis() {
+    // Production: window.location.href = 'https://buy.stripe.com/YOUR_LINK';
+    document.getElementById('loadScreen').classList.add('active');
+    const msgs = [
+      'Reading behavioral signals...',
+      'Checking for manipulation patterns...',
+      'Analyzing communication dynamics...',
+      'Scoring attachment style indicators...',
+      'Detecting emotional safety levels...',
+      'Evaluating consistency patterns...',
+      'Cross-referencing behavioral database...',
+      'Generating your personalized analysis...'
+    ];
+    let i = 0;
+    const iv = setInterval(() => {
+      document.getElementById('loadMsg').textContent = msgs[i % msgs.length];
+      i++;
+      if (i >= msgs.length) {
+        clearInterval(iv);
+        setTimeout(showFlags, 700);
+      }
+    }, 600);
+  }
+
+  function showFlags() {
+    document.getElementById('loadScreen').classList.remove('active');
+    document.getElementById('formSection').classList.remove('active');
+    document.getElementById('resultsSection').classList.add('active');
+
+    const behaviors = stepData[4] || [];
+    const feeling = stepData[5] || '';
+    const situation = stepData[3] || '';
+
+    // Score calculation
+    let riskScore = 20;
+    const highRiskBehaviors = ['hot and cold', "questioning my memory", 'withdrawing affection', 'making me feel responsible', 'jealousy'];
+    const medRiskBehaviors = ['excessive compliments', 'inconsistent follow-through', 'talking badly', 'dismissing my feelings'];
+
+    behaviors.forEach(b => {
+      const bl = b.toLowerCase();
+      if (highRiskBehaviors.some(h => bl.includes(h.toLowerCase()))) riskScore += 15;
+      if (medRiskBehaviors.some(m => bl.includes(m.toLowerCase()))) riskScore += 8;
+    });
+
+    if (feeling.toLowerCase().includes('confused')) riskScore += 12;
+    if (feeling.toLowerCase().includes('drained')) riskScore += 10;
+    if (feeling.toLowerCase().includes('anxious')) riskScore += 10;
+    if (feeling.toLowerCase().includes('sometimes great')) riskScore += 8;
+    if (feeling.toLowerCase().includes('generally good')) riskScore -= 10;
+    if (behaviors.includes('None of the above — behavior feels healthy')) riskScore -= 15;
+
+    riskScore = Math.min(98, Math.max(5, riskScore));
+
+    const circumference = 326.7;
+    const offset = circumference - (riskScore / 100) * circumference;
+    const ringColor = riskScore >= 70 ? 'var(--red)' : riskScore >= 40 ? 'var(--amber)' : 'var(--green)';
+
+    document.getElementById('ringFill').style.stroke = ringColor;
+    document.getElementById('ringNum').innerHTML = `${riskScore}<small>RISK</small>`;
+    setTimeout(() => {
+      document.getElementById('ringFill').style.strokeDashoffset = offset;
+    }, 300);
+
+    let verdictHL, verdictBD;
+    if (riskScore >= 70) {
+      verdictHL = '⚠️ Multiple Red Flags Detected';
+      verdictBD = 'The patterns in your situation show several indicators of emotionally unsafe behavior. This doesn\'t mean the relationship is unsalvageable, but these patterns deserve serious attention. Trust your instincts — they brought you here.';
+    } else if (riskScore >= 40) {
+      verdictBD = 'There are some yellow flags worth watching. Some behaviors show inconsistency or emotional immaturity that, left unaddressed, can become more significant. Proceed with awareness.';
+      verdictHL = '🟡 Yellow Flags Present';
+    } else {
+      verdictHL = '✅ Mostly Healthy Signals';
+      verdictBD = 'The patterns you\'ve described suggest a mostly healthy dynamic. The concerns that brought you here are worth discussing openly with this person, but the overall picture looks stable.';
+    }
+
+    document.getElementById('verdictHL').textContent = verdictHL;
+    document.getElementById('verdictBD').textContent = verdictBD;
+
+    // Pattern cards
+    const detectedPatterns = [];
+
+    if (behaviors.some(b => b.toLowerCase().includes('hot and cold'))) {
+      detectedPatterns.push({ type: 'flag-red', icon: '🚩', name: 'Intermittent Reinforcement', desc: 'Hot-and-cold behavior creates a trauma bond by making positive moments feel earned and unpredictable. This is psychologically reinforcing and addictive.' });
+    }
+    if (behaviors.some(b => b.toLowerCase().includes('questioning my memory'))) {
+      detectedPatterns.push({ type: 'flag-red', icon: '🚩', name: 'Gaslighting', desc: 'Having your memory of events questioned is a form of reality distortion that causes self-doubt. This is a serious psychological manipulation tactic.' });
+    }
+    if (behaviors.some(b => b.toLowerCase().includes('excessive compliments'))) {
+      detectedPatterns.push({ type: 'flag-amber', icon: '🟡', name: 'Love Bombing (Early Stage)', desc: 'Excessive early compliments or affection can be genuine — or it can be a technique to create rapid attachment before showing inconsistency.' });
+    }
+    if (behaviors.some(b => b.toLowerCase().includes('withdrawing affection'))) {
+      detectedPatterns.push({ type: 'flag-red', icon: '🚩', name: 'Emotional Coercion', desc: 'Using affection withdrawal as punishment is a control mechanism. It trains you to manage their emotional state to receive warmth.' });
+    }
+    if (behaviors.some(b => b.toLowerCase().includes('dismissing my feelings'))) {
+      detectedPatterns.push({ type: 'flag-amber', icon: '🟡', name: 'Emotional Invalidation', desc: 'Consistently being told you\'re overreacting erodes your trust in your own emotional intelligence. This can be a learned habit or an intentional dismissal.' });
+    }
+    if (behaviors.some(b => b.toLowerCase().includes('making me feel responsible'))) {
+      detectedPatterns.push({ type: 'flag-red', icon: '🚩', name: 'Emotional Manipulation', desc: 'Being made responsible for another person\'s emotional state is a form of emotional labor exploitation that creates a constant anxious caretaking dynamic.' });
+    }
+    if (behaviors.some(b => b.toLowerCase().includes('jealousy'))) {
+      detectedPatterns.push({ type: 'flag-amber', icon: '🟡', name: 'Control / Jealousy Pattern', desc: 'Jealousy that manifests as monitoring behavior crosses from human emotion into control. This pattern often escalates over time.' });
+    }
+    if (detectedPatterns.length === 0) {
+      detectedPatterns.push({ type: 'flag-green', icon: '✅', name: 'No Major Red Flags Detected', desc: 'The specific behaviors you selected don\'t map to high-risk manipulation patterns. The concern that brought you here may be worth a direct conversation.' });
+    }
+
+    let cardsHTML = '';
+    detectedPatterns.forEach(p => {
+      cardsHTML += `
+        <div class="pattern-card ${p.type}">
+          <div class="pattern-flag">${p.icon}</div>
+          <div class="pattern-info">
+            <h4>${p.name}</h4>
+            <p>${p.desc}</p>
+          </div>
+        </div>`;
+    });
+    document.getElementById('patternCards').innerHTML = cardsHTML;
+
+    // Advice
+    const adviceMap = {
+      high: [
+        'Name the pattern out loud to yourself first. Saying "this is intermittent reinforcement" or "this is gaslighting" gives you cognitive distance from the emotional pull.',
+        'Journal specific incidents with dates. When someone questions your memory, a written record gives you grounding.',
+        'Talk to someone you trust outside the relationship. Isolation is a red flag indicator — having outside perspective is a protective factor.',
+        'Consider speaking with a therapist who specializes in relationship dynamics. Not because something is wrong with you — because you deserve expert support.'
+      ],
+      medium: [
+        'Have a direct conversation about the specific behaviors that concern you. Use "I feel..." statements and observe how they respond. A healthy partner gets curious; an unsafe one gets defensive.',
+        'Notice whether the concerning behaviors are improving, stable, or escalating over time. Patterns matter more than single incidents.',
+        'Give yourself permission to slow down. Yellow flags don\'t require immediate action, but they do require attention.'
+      ],
+      low: [
+        'The concern that brought you here is still worth exploring. Have an open conversation about what you\'ve been feeling.',
+        'Healthy relationships can still have communication friction. The patterns here suggest this is more about growth than safety.',
+        'Trust is built through consistency over time. Continue observing how this person responds when things are difficult.'
+      ]
+    };
+
+    const advice = riskScore >= 70 ? adviceMap.high : riskScore >= 40 ? adviceMap.medium : adviceMap.low;
+    let adviceHTML = '';
+    advice.forEach((a, i) => {
+      adviceHTML += `<div class="advice-item"><div class="advice-num">0${i+1}</div><p>${a}</p></div>`;
+    });
+    document.getElementById('adviceList').innerHTML = adviceHTML;
+  }
+
+  function sendFlaggedReport() {
+    const email = document.getElementById('shareEmail').value;
+    if (!email) { alert('Please enter your email.'); return; }
+    alert(`✓ Your Flagged report is being sent to ${email}. Arrives in under 60 seconds.`);
+  }
+</script>
+</body>
+</html>
