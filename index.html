@@ -1078,42 +1078,54 @@
 
 <script>
   let curStep = 1;
+  let stepData = {};  // declared here so DOMContentLoaded restore can assign to it
 
-  // ── ON PAGE LOAD: Check if returning from Stripe payment ──
+  // ── ON PAGE LOAD: Restore session after Stripe redirects back ──
   window.addEventListener('DOMContentLoaded', async () => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('paid') === 'true') {
-      const token = params.get('session');
-      window.history.replaceState({}, '', window.location.pathname);
-      if (token) {
-        try {
-          // Restore session from Supabase
-          const res = await fetch(
-            'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(token) + '&select=step_data,email',
-            { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ', 'Content-Type': 'application/json' } }
-          );
-          const rows = await res.json();
-          if (rows && rows.length > 0) {
-            stepData = rows[0].step_data;
-            const email = rows[0].email;
-            const emailEl = document.getElementById('flagEmail');
-            if (emailEl && email) emailEl.value = email;
-            const shareEl = document.getElementById('shareEmail');
-            if (shareEl && email) shareEl.value = email;
-            // Mark session as paid in Supabase
-            await fetch(
-              'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(token),
-              { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
-            );
-            // Show loading then results
-            document.getElementById('formSection').classList.remove('active');
-            document.getElementById('loadScreen').classList.add('active');
-            runLoadingThenShow();
-            return;
-          }
-        } catch(e) { console.error('Session restore failed:', e); }
+    if (params.get('paid') !== 'true') return;
+
+    window.history.replaceState({}, '', window.location.pathname);
+
+    try {
+      // Fetch the most recent unpaid session (created in last 2 hours)
+      const res = await fetch(
+        'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?paid=eq.false&order=created_at.desc&limit=1&select=id,session_token,step_data,email',
+        { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ', 'Content-Type': 'application/json' } }
+      );
+      const rows = await res.json();
+      if (!rows || rows.length === 0) {
+        console.error('No pending session found');
+        return;
       }
-    }
+
+      const row = rows[0];
+      // Restore step data
+      Object.assign(stepData, row.step_data || {});
+
+      // Restore email into all fields
+      const email = row.email || stepData.email || '';
+      if (email) {
+        stepData.email = email;
+        const flagEmailEl = document.getElementById('flagEmail');
+        if (flagEmailEl) flagEmailEl.value = email;
+        const shareEmailEl = document.getElementById('shareEmail');
+        if (shareEmailEl) shareEmailEl.value = email;
+      }
+
+      // Mark session paid
+      await fetch(
+        'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(row.session_token),
+        { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
+      );
+
+      // Show loading animation then results
+      document.getElementById('heroSection') && (document.getElementById('heroSection').style.display = 'none');
+      document.getElementById('formSection').classList.remove('active');
+      document.getElementById('loadScreen').classList.add('active');
+      runLoadingThenShow();
+
+    } catch(e) { console.error('Session restore failed:', e); }
   });
 
   function runLoadingThenShow() {
@@ -1138,7 +1150,6 @@
     }, 600);
   }
   const totalSteps = 6;
-  const stepData = {};
 
   function startFlagged() {
     document.getElementById('heroSection').style.display = 'none';
@@ -1221,37 +1232,24 @@
   }
 
   async function runAnalysis() {
-    const email = stepData.email || (document.getElementById('flagEmail') ? document.getElementById('flagEmail').value : '');
-    if (!email) { alert('Please enter your email address before paying.'); return; }
+    // Email collected at step 6 and stored in stepData.email
+    const email = stepData.email || (document.getElementById('flagEmail') ? document.getElementById('flagEmail').value.trim() : '');
+    if (!email) { alert('Please complete step 6 with your email address before paying.'); return; }
 
-    // Generate unique session token
     const token = crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substr(2));
 
     try {
-      // Save session to Supabase before leaving for Stripe
-      const saveRes = await fetch(
-        'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions',
-        {
-          method: 'POST',
-          headers: {
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ',
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({ session_token: token, email: email, step_data: stepData })
-        }
-      );
-      if (!saveRes.ok) throw new Error('Session save failed');
-    } catch(e) {
-      console.error('Could not save session:', e);
-      // Still proceed — worst case they see results but email fails
-    }
+      const saveRes = await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions', {
+        method: 'POST',
+        headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ session_token: token, email: email, step_data: stepData, paid: false })
+      });
+      if (!saveRes.ok) console.error('Session save failed:', await saveRes.text());
+    } catch(e) { console.error('Session save error:', e); }
 
-    // Redirect to Stripe — Stripe success_url is set to https://getflagged.vercel.app?paid=true&session=TOKEN
-    // We update the payment link success URL dynamically via Supabase Edge Function, OR
-    // use prefilled_email to pass the token. Best approach: store token in Stripe metadata
-    // For now: redirect with token encoded so Stripe returns it in success URL
-    window.location.href = 'https://buy.stripe.com/14A14nculbyLdjdcX06sw02?utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis&utm_content=pay_button&client_reference_id=' + encodeURIComponent(token);
+    // Stripe success URL: getflagged.vercel.app?paid=true&cs={CHECKOUT_SESSION_ID}
+    // On return, DOMContentLoaded fetches most recent unpaid session and restores it
+    window.location.href = 'https://buy.stripe.com/14A14nculbyLdjdcX06sw02?utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis&utm_content=pay_button';
   }
 
   function showFlags() {
@@ -1262,7 +1260,7 @@
     // Auto-send email AFTER results are fully rendered in the DOM
     // Using 3500ms delay to ensure all pattern items and advice are in the DOM
     setTimeout(async () => {
-      const email = stepData.email || (document.getElementById('shareEmail') ? document.getElementById('shareEmail').value : '');
+      const email = stepData.email || (document.getElementById('shareEmail') ? document.getElementById('shareEmail').value.trim() : '') || (document.getElementById('flagEmail') ? document.getElementById('flagEmail').value.trim() : '');
       if (!email) return;
 
       // Set email fields
