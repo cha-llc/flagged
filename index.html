@@ -1066,22 +1066,6 @@
   </footer>
 </div>
 
-<!-- PAYMENT GATE — shown after Stripe opens, before results reveal -->
-<div class="payment-gate" id="paymentGate">
-  <div class="gate-card">
-    <div class="gate-icon">🔒</div>
-    <h2 class="gate-title">Complete Your Payment</h2>
-    <p class="gate-sub">Your Stripe checkout opened in a new tab. Once your $4.99 payment is complete, come back here and click the button below to access your full analysis.</p>
-    <button class="gate-btn" onclick="confirmPaymentAndReveal()">
-      ✓ I've Completed Payment — Show My Report
-    </button>
-    <p class="gate-note">Having trouble? <a href="mailto:cs@cjhadisa.com" style="color:#d63031;">Email us</a> and we'll manually deliver your report within 1 hour.</p>
-    <button class="gate-retry" onclick="window.open('https://buy.stripe.com/14A14nculbyLdjdcX06sw02?utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis&utm_content=pay_button','_blank')">
-      ↗ Reopen Payment Link
-    </button>
-  </div>
-</div>
-
 <div class="load-screen" id="loadScreen">
   <div class="load-flags">
     <div class="load-flag"></div>
@@ -1094,6 +1078,62 @@
 
 <script>
   let curStep = 1;
+
+  // ── ON PAGE LOAD: Check if returning from Stripe payment ──
+  window.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('paid') === 'true') {
+      // Customer returning from successful Stripe payment
+      try {
+        const saved = localStorage.getItem('flagged_pending');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Only use data less than 2 hours old
+          if (Date.now() - parsed.timestamp < 7200000) {
+            stepData = parsed.stepData;
+            // Restore email field
+            const emailEl = document.getElementById('flagEmail');
+            if (emailEl && stepData.email) emailEl.value = stepData.email;
+            const shareEl = document.getElementById('shareEmail');
+            if (shareEl && stepData.email) shareEl.value = stepData.email;
+            // Clean URL without reloading
+            window.history.replaceState({}, '', window.location.pathname);
+            // Clear saved data
+            localStorage.removeItem('flagged_pending');
+            // Show loading then results
+            document.getElementById('formSection').classList.remove('active');
+            document.getElementById('loadScreen').classList.add('active');
+            runLoadingThenShow();
+            return;
+          }
+        }
+      } catch(e) { console.warn('Restore failed:', e); }
+      // If restore failed, clean URL and show form from start
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  });
+
+  function runLoadingThenShow() {
+    const msgs = [
+      'Reading behavioral signals...',
+      'Checking for manipulation patterns...',
+      'Analyzing communication dynamics...',
+      'Scoring attachment style indicators...',
+      'Detecting emotional safety levels...',
+      'Evaluating consistency patterns...',
+      'Cross-referencing behavioral database...',
+      'Generating your personalized analysis...'
+    ];
+    let i = 0;
+    const iv = setInterval(() => {
+      document.getElementById('loadMsg').textContent = msgs[i % msgs.length];
+      i++;
+      if (i >= msgs.length) {
+        clearInterval(iv);
+        setTimeout(showFlags, 700);
+      }
+    }, 600);
+  }
   const totalSteps = 6;
   const stepData = {};
 
@@ -1178,38 +1218,18 @@
   }
 
   function runAnalysis() {
-    // Step 1: Open Stripe in new tab
-    window.open('https://buy.stripe.com/14A14nculbyLdjdcX06sw02?utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis&utm_content=pay_button', '_blank');
+    // Save ALL step data to localStorage before leaving for Stripe
+    // so we can restore and show results when Stripe redirects back
+    try {
+      localStorage.setItem('flagged_pending', JSON.stringify({
+        stepData: stepData,
+        timestamp: Date.now()
+      }));
+    } catch(e) { console.warn('localStorage unavailable:', e); }
 
-    // Step 2: Show payment confirmation gate — don't reveal results until customer confirms
-    document.getElementById('formSection').classList.remove('active');
-    document.getElementById('paymentGate').classList.add('active');
-  }
-
-  function confirmPaymentAndReveal() {
-    // Customer clicked "I've completed payment" — now run analysis and show results
-    document.getElementById('paymentGate').classList.remove('active');
-    document.getElementById('loadScreen').classList.add('active');
-
-    const msgs = [
-      'Reading behavioral signals...',
-      'Checking for manipulation patterns...',
-      'Analyzing communication dynamics...',
-      'Scoring attachment style indicators...',
-      'Detecting emotional safety levels...',
-      'Evaluating consistency patterns...',
-      'Cross-referencing behavioral database...',
-      'Generating your personalized analysis...'
-    ];
-    let i = 0;
-    const iv = setInterval(() => {
-      document.getElementById('loadMsg').textContent = msgs[i % msgs.length];
-      i++;
-      if (i >= msgs.length) {
-        clearInterval(iv);
-        setTimeout(showFlags, 700);
-      }
-    }, 600);
+    // Redirect customer to Stripe in SAME tab
+    // Stripe success_url sends them back to this page with ?paid=true
+    window.location.href = 'https://buy.stripe.com/14A14nculbyLdjdcX06sw02?utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis&utm_content=pay_button';
   }
 
   function showFlags() {
