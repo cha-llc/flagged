@@ -1091,7 +1091,7 @@
       // Fetch the most recent unpaid session (created in last 2 hours)
       const res = await fetch(
         'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?paid=eq.false&order=created_at.desc&limit=1&select=id,session_token,step_data,email',
-        { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ', 'Content-Type': 'application/json' } }
+        { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
       );
       const rows = await res.json();
       if (!rows || rows.length === 0) {
@@ -1116,7 +1116,7 @@
       // Mark session paid
       await fetch(
         'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(row.session_token),
-        { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
+        { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
       );
 
       // Show loading animation then results
@@ -1241,7 +1241,7 @@
     try {
       const saveRes = await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions', {
         method: 'POST',
-        headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjAzMTksImV4cCI6MjA5MTQ5NjMxOX0.GJpnEXnyQM_-_GJAuaLjXqsRJeXFo6j7p3MupgPEBLQ', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
         body: JSON.stringify({ session_token: token, email: email, step_data: stepData, paid: false })
       });
       if (!saveRes.ok) console.error('Session save failed:', await saveRes.text());
