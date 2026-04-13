@@ -970,7 +970,8 @@
       <p>Detailed analysis, attachment style breakdown, and communication scripts sent to your inbox.</p>
       <div class="share-input-row">
         <input type="email" id="shareEmail" placeholder="your@email.com" />
-        <button onclick="sendFlaggedReport()">Send →</button>
+        <button class="btn-send-report" onclick="sendFlaggedReport()">Send My Report →</button>
+        <div id="sendConfirm" style="display:none;margin-top:10px;font-size:0.8rem;color:#2a7a4a;letter-spacing:0.05em;">✓ Report sent — check your inbox within 60 seconds.</div>
       </div>
     </div>
   </section>
@@ -1105,6 +1106,12 @@
     document.getElementById('formSection').classList.remove('active');
     document.getElementById('resultsSection').classList.add('active');
 
+    // Auto-send report to customer email immediately on results render
+    setTimeout(() => {
+      const email = stepData.email || (document.getElementById('shareEmail') ? document.getElementById('shareEmail').value : '');
+      if (email) autoSendReport(email);
+    }, 1500);
+
     const behaviors = stepData[4] || [];
     const feeling = stepData[5] || '';
     const situation = stepData[3] || '';
@@ -1223,10 +1230,125 @@
     document.getElementById('adviceList').innerHTML = adviceHTML;
   }
 
-  function sendFlaggedReport() {
+  async function sendFlaggedReport() {
     const email = document.getElementById('shareEmail').value;
     if (!email) { alert('Please enter your email.'); return; }
-    alert(`✓ Your Flagged report is being sent to ${email}. Arrives in under 60 seconds.`);
+
+    const btn = document.querySelector('.btn-send-report');
+    if (btn) { btn.textContent = 'Sending...'; btn.disabled = true; }
+
+    try {
+      const reportData = buildReportEmailHTML();
+      const response = await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: email,
+          subject: 'Your Flagged Report — Pattern Analysis Complete',
+          html: reportData
+        })
+      });
+
+      if (response.ok) {
+        if (btn) { btn.textContent = 'Report Sent ✓'; btn.style.background = '#2a7a4a'; }
+        document.getElementById('sendConfirm').style.display = 'block';
+      } else {
+        throw new Error('Send failed');
+      }
+    } catch (err) {
+      if (btn) { btn.textContent = 'Send My Report'; btn.disabled = false; }
+      alert('There was an issue sending your report. Please email cs@cjhadisa.com and we will send it manually within 1 hour.');
+    }
+  }
+
+  function buildReportEmailHTML() {
+    const riskScore = document.getElementById('riskScore') ? document.getElementById('riskScore').textContent : 'N/A';
+    const riskLabel = document.getElementById('riskLabel') ? document.getElementById('riskLabel').textContent : '';
+    const patterns = [];
+    document.querySelectorAll('.pattern-item').forEach(p => {
+      const name = p.querySelector('.pattern-name');
+      const desc = p.querySelector('.pattern-desc');
+      if (name) patterns.push({ name: name.textContent, desc: desc ? desc.textContent : '' });
+    });
+    const advice = [];
+    document.querySelectorAll('.advice-item p').forEach(a => advice.push(a.textContent));
+
+    let patternsHTML = patterns.map(p =>
+      `<tr><td style="padding:10px;border-bottom:1px solid #f0e8e0;font-weight:600;color:#d63031;">${p.name}</td><td style="padding:10px;border-bottom:1px solid #f0e8e0;color:#3a2a22;">${p.desc}</td></tr>`
+    ).join('');
+
+    let adviceHTML = advice.map((a, i) =>
+      `<p style="margin:0 0 12px;padding:12px 16px;background:#fff8f5;border-left:3px solid #d63031;color:#3a2a22;font-size:14px;"><strong>0${i+1}.</strong> ${a}</p>`
+    ).join('');
+
+    return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#fdf8f3;font-family:Georgia,serif;">
+  <div style="max-width:600px;margin:0 auto;background:#fdf8f3;">
+
+    <!-- HEADER -->
+    <div style="background:#1a0f0a;padding:32px 40px;text-align:center;">
+      <div style="font-size:28px;font-weight:800;color:#fdf8f3;letter-spacing:-0.03em;">🚩 Flagged</div>
+      <div style="font-size:11px;letter-spacing:0.2em;color:rgba(253,248,243,0.4);text-transform:uppercase;margin-top:6px;">AI Relationship Pattern Analyzer · C.H.A. LLC</div>
+    </div>
+
+    <!-- RISK SCORE -->
+    <div style="background:#d63031;padding:40px;text-align:center;">
+      <div style="font-size:11px;letter-spacing:0.2em;color:rgba(255,255,255,0.7);text-transform:uppercase;margin-bottom:12px;">Your Risk Score</div>
+      <div style="font-size:80px;font-weight:800;color:white;line-height:1;">${riskScore}</div>
+      <div style="font-size:18px;color:rgba(255,255,255,0.9);margin-top:8px;">${riskLabel}</div>
+    </div>
+
+    <!-- BODY -->
+    <div style="padding:40px;">
+      <h2 style="font-size:18px;color:#1a0f0a;margin:0 0 8px;">Patterns Detected</h2>
+      <p style="font-size:13px;color:#8b6355;margin:0 0 20px;">The following behavioral patterns were identified in your situation.</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:32px;">
+        ${patternsHTML || '<tr><td colspan="2" style="padding:16px;color:#8b6355;font-size:13px;">No specific patterns detected at this threshold.</td></tr>'}
+      </table>
+
+      <h2 style="font-size:18px;color:#1a0f0a;margin:0 0 8px;">Personalized Advice</h2>
+      <p style="font-size:13px;color:#8b6355;margin:0 0 20px;">Based on your specific situation and the patterns identified.</p>
+      ${adviceHTML || '<p style="color:#8b6355;font-size:14px;">No specific advice generated.</p>'}
+
+      <!-- DISCLAIMER -->
+      <div style="background:#fff0ed;border:1px solid #f5d0c8;padding:20px;margin-top:32px;">
+        <p style="margin:0;font-size:12px;color:#8b6355;line-height:1.7;">
+          <strong>Important:</strong> Flagged is an awareness tool for educational purposes only. It is not a clinical diagnosis and does not replace professional support. If you are in immediate danger, call 911. National DV Hotline: <strong>1-800-799-7233</strong> (24/7). Crisis Text Line: Text <strong>START</strong> to 88788.
+        </p>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="background:#1a0f0a;padding:24px 40px;text-align:center;">
+      <p style="margin:0;font-size:11px;color:rgba(253,248,243,0.35);letter-spacing:0.08em;">FLAGGED · GETFLAGGED.VERCEL.APP · C.H.A. LLC</p>
+      <p style="margin:8px 0 0;font-size:11px;color:rgba(253,248,243,0.25);">Questions? cs@cjhadisa.com</p>
+    </div>
+
+  </div>
+</body>
+</html>`;
+  }
+
+  // Auto-send report when results render
+  async function autoSendReport(email) {
+    if (!email) return;
+    try {
+      const reportData = buildReportEmailHTML();
+      await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: email,
+          subject: 'Your Flagged Report — Pattern Analysis Complete',
+          html: reportData
+        })
+      });
+    } catch (err) {
+      console.error('Auto-send failed:', err);
+    }
   }
 </script>
 </body>
