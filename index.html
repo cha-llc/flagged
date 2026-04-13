@@ -777,6 +777,87 @@
     letter-spacing: 0.08em;
     text-align: center;
   }
+
+  /* ── PAYMENT GATE ── */
+  .payment-gate {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(26,15,10,0.96);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .payment-gate.active { display: flex; }
+
+  .gate-card {
+    background: #fdf8f3;
+    max-width: 480px;
+    width: 100%;
+    padding: 48px 40px;
+    text-align: center;
+    border-top: 4px solid #d63031;
+  }
+
+  .gate-icon {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+  }
+
+  .gate-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #1a0f0a;
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+  }
+
+  .gate-sub {
+    font-size: 0.9rem;
+    color: #6b4c3b;
+    line-height: 1.7;
+    margin: 0 0 28px;
+  }
+
+  .gate-btn {
+    width: 100%;
+    background: #d63031;
+    color: white;
+    border: none;
+    padding: 18px 24px;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: background 0.2s;
+    margin-bottom: 16px;
+  }
+
+  .gate-btn:hover { background: #b02828; }
+
+  .gate-note {
+    font-size: 0.78rem;
+    color: #8b6355;
+    margin: 0 0 16px;
+    line-height: 1.6;
+  }
+
+  .gate-retry {
+    background: none;
+    border: 1px solid #d4cdbf;
+    color: #8b6355;
+    padding: 10px 20px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-family: 'Syne', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .gate-retry:hover { border-color: #d63031; color: #d63031; }
+
 </style>
 <script type="text/javascript">function googleTranslateElementInit(){new google.translate.TranslateElement({pageLanguage:"en",includedLanguages:"",layout:google.translate.TranslateElement.InlineLayout.SIMPLE,autoDisplay:false},"google_translate_element")}</script><script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script></head>
 <body><div id="lang_bar" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(13,13,13,0.96);backdrop-filter:blur(10px);padding:7px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="font-size:0.62rem;letter-spacing:0.18em;color:#888;text-transform:uppercase;white-space:nowrap;font-family:monospace;">🌐 TRANSLATE</span><div id="google_translate_element"></div></div><div style="height:40px"></div>
@@ -940,6 +1021,9 @@
 
   <!-- RESULTS -->
   <section class="results-section" id="resultsSection">
+    <!-- Email delivery confirmation banner -->
+    <div id="emailDeliveryConfirm" style="display:none;background:#f0fdf4;border:1px solid #86efac;padding:14px 20px;margin-bottom:24px;font-size:0.85rem;letter-spacing:0.03em;font-family:'JetBrains Mono',monospace;"></div>
+
     <div class="overall-score">
       <div class="score-ring">
         <svg viewBox="0 0 120 120">
@@ -980,6 +1064,22 @@
     <span>© 2026 FLAGGED</span>
     <span>PRIVATE · SECURE · AI-POWERED</span>
   </footer>
+</div>
+
+<!-- PAYMENT GATE — shown after Stripe opens, before results reveal -->
+<div class="payment-gate" id="paymentGate">
+  <div class="gate-card">
+    <div class="gate-icon">🔒</div>
+    <h2 class="gate-title">Complete Your Payment</h2>
+    <p class="gate-sub">Your Stripe checkout opened in a new tab. Once your $4.99 payment is complete, come back here and click the button below to access your full analysis.</p>
+    <button class="gate-btn" onclick="confirmPaymentAndReveal()">
+      ✓ I've Completed Payment — Show My Report
+    </button>
+    <p class="gate-note">Having trouble? <a href="mailto:cs@cjhadisa.com" style="color:#d63031;">Email us</a> and we'll manually deliver your report within 1 hour.</p>
+    <button class="gate-retry" onclick="window.open('https://buy.stripe.com/14A14nculbyLdjdcX06sw02?utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis&utm_content=pay_button','_blank')">
+      ↗ Reopen Payment Link
+    </button>
+  </div>
 </div>
 
 <div class="load-screen" id="loadScreen">
@@ -1078,8 +1178,19 @@
   }
 
   function runAnalysis() {
+    // Step 1: Open Stripe in new tab
     window.open('https://buy.stripe.com/14A14nculbyLdjdcX06sw02?utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis&utm_content=pay_button', '_blank');
+
+    // Step 2: Show payment confirmation gate — don't reveal results until customer confirms
+    document.getElementById('formSection').classList.remove('active');
+    document.getElementById('paymentGate').classList.add('active');
+  }
+
+  function confirmPaymentAndReveal() {
+    // Customer clicked "I've completed payment" — now run analysis and show results
+    document.getElementById('paymentGate').classList.remove('active');
     document.getElementById('loadScreen').classList.add('active');
+
     const msgs = [
       'Reading behavioral signals...',
       'Checking for manipulation patterns...',
@@ -1106,11 +1217,27 @@
     document.getElementById('formSection').classList.remove('active');
     document.getElementById('resultsSection').classList.add('active');
 
-    // Auto-send report to customer email immediately on results render
-    setTimeout(() => {
+    // Auto-send report to customer email immediately after results render
+    setTimeout(async () => {
       const email = stepData.email || (document.getElementById('shareEmail') ? document.getElementById('shareEmail').value : '');
-      if (email) autoSendReport(email);
-    }, 1500);
+      if (email) {
+        const sent = await autoSendReport(email);
+        // Show on-screen email confirmation
+        const confirmEl = document.getElementById('emailDeliveryConfirm');
+        if (confirmEl) {
+          confirmEl.textContent = sent
+            ? '✓ Report also sent to ' + email + ' — check your inbox.'
+            : '⚠ Auto-delivery failed. Use the button below to resend.';
+          confirmEl.style.color = sent ? '#2a7a4a' : '#d63031';
+          confirmEl.style.display = 'block';
+        }
+        // Also update the shareEmail field and send confirm div
+        const shareEl = document.getElementById('shareEmail');
+        if (shareEl) shareEl.value = email;
+        const confirmDiv = document.getElementById('sendConfirm');
+        if (confirmDiv && sent) confirmDiv.style.display = 'block';
+      }
+    }, 2000);
 
     const behaviors = stepData[4] || [];
     const feeling = stepData[5] || '';
@@ -1332,12 +1459,12 @@
 </html>`;
   }
 
-  // Auto-send report when results render
+  // Auto-send report when results render — returns true on success
   async function autoSendReport(email) {
-    if (!email) return;
+    if (!email) return false;
     try {
       const reportData = buildReportEmailHTML();
-      await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/send-report', {
+      const res = await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/send-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1346,8 +1473,11 @@
           html: reportData
         })
       });
+      const data = await res.json();
+      return data.success === true;
     } catch (err) {
       console.error('Auto-send failed:', err);
+      return false;
     }
   }
 </script>
