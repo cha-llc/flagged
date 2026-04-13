@@ -1239,7 +1239,7 @@
 
     try {
       const reportData = buildReportEmailHTML();
-      const response = await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/send-email', {
+      const response = await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/send-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1337,7 +1337,7 @@
     if (!email) return;
     try {
       const reportData = buildReportEmailHTML();
-      await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/send-email', {
+      await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/send-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
