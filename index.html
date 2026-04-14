@@ -1038,11 +1038,21 @@
         } catch(e) {}
       }
 
-      // ── FALLBACK: cookie token → direct Supabase lookup ──
+      // ── FALLBACK: cookie/localStorage token → direct Supabase lookup ──
       if (!restoredStepData) {
+        // Try cookie first, then localStorage (localStorage is more reliable across Stripe redirects)
         const cookieMatch = document.cookie.match(/fg_token=([^;]+)/);
-        const urlToken = cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
+        let urlToken = cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
+        if (!urlToken) {
+          try {
+            const lsToken = localStorage.getItem('fg_pending_token');
+            const lsTs = parseInt(localStorage.getItem('fg_pending_ts') || '0');
+            if (lsToken && (Date.now() - lsTs) < 7200000) urlToken = lsToken;
+          } catch(e) {}
+        }
+        // Clear both stores
         document.cookie = 'fg_token=; path=/; max-age=0';
+        try { localStorage.removeItem('fg_pending_token'); localStorage.removeItem('fg_pending_ts'); } catch(e) {}
         if (urlToken) {
           const r = await fetch(
             'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(urlToken) + '&select=session_token,step_data,email',
@@ -1212,8 +1222,9 @@
       reportInternalError('Flagged', 'session_save', e.message, email);
     }
 
-    // Cookie backup (in case cs param is unavailable)
+    // Store token for session restore after Stripe redirect (both cookie + localStorage for reliability)
     document.cookie = 'fg_token=' + encodeURIComponent(token) + '; path=/; max-age=7200; SameSite=Lax';
+    try { localStorage.setItem('fg_pending_token', token); localStorage.setItem('fg_pending_ts', Date.now().toString()); } catch(e) {}
     const stripeUrl = 'https://buy.stripe.com/14A14nculbyLdjdcX06sw02'
       + '?prefilled_email=' + encodeURIComponent(email)
       + '&client_reference_id=' + encodeURIComponent(token)
