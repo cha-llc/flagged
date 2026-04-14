@@ -1096,11 +1096,46 @@
   window.addEventListener('DOMContentLoaded', async () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('paid') !== 'true') return;
-    // Keep params available during async fetch — clean URL after restore completes
 
+    // ── PRIMARY RESTORE: localStorage (100% reliable across cross-origin navigation) ──
     try {
-      // Strategy: look up by token param first (exact match), fall back to paid=eq.false
-      // Read token from cookie (survives Stripe redirect) or sessionStorage backup
+      const stored = localStorage.getItem('fg_step_data');
+      if (stored) {
+        const restoredStepData = JSON.parse(stored);
+        const restoredEmail = localStorage.getItem('fg_email') || '';
+        const restoredToken = localStorage.getItem('fg_token') || '';
+        // Clear immediately — one-time use
+        localStorage.removeItem('fg_step_data');
+        localStorage.removeItem('fg_email');
+        localStorage.removeItem('fg_token');
+        // Restore into global stepData
+        Object.assign(stepData, restoredStepData);
+        if (restoredEmail) {
+          stepData.email = restoredEmail;
+          const flagEmailEl = document.getElementById('flagEmail');
+          if (flagEmailEl) flagEmailEl.value = restoredEmail;
+          const shareEmailEl = document.getElementById('shareEmail');
+          if (shareEmailEl) shareEmailEl.value = restoredEmail;
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+        // Mark paid in background — fire and forget
+        if (restoredToken) {
+          fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(restoredToken),
+            { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
+          ).catch(() => {});
+        }
+        // Show loading → results
+        document.getElementById('heroSection') && (document.getElementById('heroSection').style.display = 'none');
+        document.getElementById('formSection').classList.remove('active');
+        document.getElementById('loadScreen').classList.add('active');
+        runLoadingThenShow();
+        return;
+      }
+    } catch(e) {}
+
+    // ── FALLBACK: Supabase lookup via cookie/token (handles cases where localStorage was cleared) ──
+    try {
+      // Read token from cookie or sessionStorage
       let urlToken = params.get('t') || params.get('client_reference_id') || '';
       if (!urlToken) {
         const cookieMatch = document.cookie.match(/fg_token=([^;]+)/);
@@ -1297,13 +1332,15 @@
       reportInternalError('Flagged', 'session_save', e.message, email);
     }
 
-    // Pass token in success URL so restore is exact — no guessing with paid=eq.false
-    // Stripe Payment Links support ?prefilled_email and client_reference_id via metadata
-    // We embed the token in the success URL directly using Stripe's {CHECKOUT_SESSION_ID} pattern
-    // Format: ?paid=true&t=TOKEN — on return we lookup by session_token directly
-    // Store token in cookie so it survives Stripe redirect (cookies persist across navigation)
+    // Store full step data in localStorage — guaranteed to survive cross-origin navigation
+    try {
+      localStorage.setItem('fg_token', token);
+      localStorage.setItem('fg_step_data', JSON.stringify(stepData));
+      localStorage.setItem('fg_email', email);
+    } catch(e) {}
+    // Cookie as secondary backup
     document.cookie = 'fg_token=' + encodeURIComponent(token) + '; path=/; max-age=7200; SameSite=Lax';
-    // Also store in sessionStorage as backup (some browsers block cookies)
+    // sessionStorage as tertiary backup
     try { sessionStorage.setItem('fg_token', token); } catch(e) {}
     const stripeUrl = 'https://buy.stripe.com/14A14nculbyLdjdcX06sw02'
       + '?prefilled_email=' + encodeURIComponent(email)
@@ -1499,12 +1536,13 @@
   }
 
   function buildReportEmailHTML() {
-    const riskScore = document.getElementById('riskScore') ? document.getElementById('riskScore').textContent : 'N/A';
-    const riskLabel = document.getElementById('riskLabel') ? document.getElementById('riskLabel').textContent : '';
+    const ringNum = document.getElementById('ringNum');
+    const riskScore = ringNum ? ringNum.textContent.replace('RISK', '').trim() : 'N/A';
+    const riskLabel = document.getElementById('verdictHL') ? document.getElementById('verdictHL').textContent : '';
     const patterns = [];
-    document.querySelectorAll('.pattern-item').forEach(p => {
-      const name = p.querySelector('.pattern-name');
-      const desc = p.querySelector('.pattern-desc');
+    document.querySelectorAll('.pattern-card').forEach(p => {
+      const name = p.querySelector('h4');
+      const desc = p.querySelector('.pattern-info p');
       if (name) patterns.push({ name: name.textContent, desc: desc ? desc.textContent : '' });
     });
     const advice = [];
