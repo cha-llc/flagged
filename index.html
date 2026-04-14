@@ -778,89 +778,10 @@
     text-align: center;
   }
 
-  /* ── PAYMENT GATE ── */
-  .payment-gate {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(26,15,10,0.96);
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-  }
-  .payment-gate.active { display: flex; }
-
-  .gate-card {
-    background: #fdf8f3;
-    max-width: 480px;
-    width: 100%;
-    padding: 48px 40px;
-    text-align: center;
-    border-top: 4px solid #d63031;
-  }
-
-  .gate-icon {
-    font-size: 2.5rem;
-    margin-bottom: 20px;
-  }
-
-  .gate-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: #1a0f0a;
-    margin: 0 0 12px;
-    letter-spacing: -0.02em;
-  }
-
-  .gate-sub {
-    font-size: 0.9rem;
-    color: #6b4c3b;
-    line-height: 1.7;
-    margin: 0 0 28px;
-  }
-
-  .gate-btn {
-    width: 100%;
-    background: #d63031;
-    color: white;
-    border: none;
-    padding: 18px 24px;
-    font-family: 'Syne', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
-    cursor: pointer;
-    letter-spacing: 0.02em;
-    transition: background 0.2s;
-    margin-bottom: 16px;
-  }
-
-  .gate-btn:hover { background: #b02828; }
-
-  .gate-note {
-    font-size: 0.78rem;
-    color: #8b6355;
-    margin: 0 0 16px;
-    line-height: 1.6;
-  }
-
-  .gate-retry {
-    background: none;
-    border: 1px solid #d4cdbf;
-    color: #8b6355;
-    padding: 10px 20px;
-    font-size: 0.78rem;
-    cursor: pointer;
-    font-family: 'Syne', sans-serif;
-    transition: all 0.2s;
-  }
-
-  .gate-retry:hover { border-color: #d63031; color: #d63031; }
 
 </style>
-<script type="text/javascript">function googleTranslateElementInit(){new google.translate.TranslateElement({pageLanguage:"en",includedLanguages:"",layout:google.translate.TranslateElement.InlineLayout.SIMPLE,autoDisplay:false},"google_translate_element")}
-  // ── INTERNAL ERROR REPORTING — sends to #technical-alerts + cs@cjhadisa.com ──
+<script type="text/javascript">
+  // ── INTERNAL ERROR REPORTING ──
   async function reportInternalError(product, stage, errorMsg, customerEmail) {
     try {
       await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/internal-alert', {
@@ -870,9 +791,9 @@
       });
     } catch(e) { console.error('Alert failed silently:', e); }
   }
-
-</script><script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script></head>
-<body><div id="lang_bar" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(13,13,13,0.96);backdrop-filter:blur(10px);padding:7px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="font-size:0.62rem;letter-spacing:0.18em;color:#888;text-transform:uppercase;white-space:nowrap;font-family:monospace;">🌐 TRANSLATE</span><div id="google_translate_element"></div></div><div style="height:40px"></div>
+</script>
+</head>
+<body>
 
 <div class="wrap">
   <nav class="nav">
