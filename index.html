@@ -1033,9 +1033,6 @@
 
   <!-- RESULTS -->
   <section class="results-section" id="resultsSection">
-    <!-- Email delivery confirmation banner -->
-    <div id="emailDeliveryConfirm" style="display:none;background:#f0fdf4;border:1px solid #86efac;padding:14px 20px;margin-bottom:24px;font-size:0.85rem;letter-spacing:0.03em;font-family:'JetBrains Mono',monospace;"></div>
-
     <div class="overall-score">
       <div class="score-ring">
         <svg viewBox="0 0 120 120">
@@ -1066,9 +1063,9 @@
       <p>Detailed analysis, attachment style breakdown, and communication scripts sent to your inbox.</p>
       <div class="share-input-row">
         <input type="email" id="shareEmail" placeholder="your@email.com" />
-        <button class="btn-send-report" onclick="sendFlaggedReport()">Send My Report →</button>
-        <div id="sendConfirm" style="display:none;margin-top:10px;font-size:0.8rem;color:#2a7a4a;letter-spacing:0.05em;">✓ Report sent — check your inbox within 60 seconds.</div>
+        <button class="btn-send-report" onclick="sendFlaggedReport()">Send →</button>
       </div>
+      <div id="sendConfirm" style="display:none;margin-top:10px;font-size:0.8rem;color:rgba(255,255,255,0.9);letter-spacing:0.05em;">✓ Report sent — check your inbox within 60 seconds.</div>
     </div>
   </section>
 
