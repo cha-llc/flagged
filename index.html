@@ -1097,112 +1097,74 @@
     const params = new URLSearchParams(window.location.search);
     if (params.get('paid') !== 'true') return;
 
-    // ── PRIMARY RESTORE: localStorage (100% reliable across cross-origin navigation) ──
     try {
-      const stored = localStorage.getItem('fg_step_data');
-      if (stored) {
-        const restoredStepData = JSON.parse(stored);
-        const restoredEmail = localStorage.getItem('fg_email') || '';
-        const restoredToken = localStorage.getItem('fg_token') || '';
-        // Clear immediately — one-time use
-        localStorage.removeItem('fg_step_data');
-        localStorage.removeItem('fg_email');
-        localStorage.removeItem('fg_token');
-        // Restore into global stepData
-        Object.assign(stepData, restoredStepData);
-        if (restoredEmail) {
-          stepData.email = restoredEmail;
-          const flagEmailEl = document.getElementById('flagEmail');
-          if (flagEmailEl) flagEmailEl.value = restoredEmail;
-          const shareEmailEl = document.getElementById('shareEmail');
-          if (shareEmailEl) shareEmailEl.value = restoredEmail;
-        }
-        window.history.replaceState({}, '', window.location.pathname);
-        // Mark paid in background — fire and forget
-        if (restoredToken) {
-          fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(restoredToken),
-            { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
-          ).catch(() => {});
-        }
-        // Show loading → results
-        document.getElementById('heroSection') && (document.getElementById('heroSection').style.display = 'none');
-        document.getElementById('formSection').classList.remove('active');
-        document.getElementById('loadScreen').classList.add('active');
-        runLoadingThenShow();
-        return;
-      }
-    } catch(e) {}
+      let restoredStepData = null;
+      let restoredEmail = '';
 
-    // ── FALLBACK: Supabase lookup via cookie/token (handles cases where localStorage was cleared) ──
-    try {
-      // Read token from cookie or sessionStorage
-      let urlToken = params.get('t') || params.get('client_reference_id') || '';
-      if (!urlToken) {
+      // ── PRIMARY: use Stripe checkout session ID → server-side Supabase lookup ──
+      const cs = params.get('cs') || '';
+      if (cs) {
+        try {
+          const res = await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/restore-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cs })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              restoredStepData = data.step_data;
+              restoredEmail = data.email || '';
+            }
+          }
+        } catch(e) {}
+      }
+
+      // ── FALLBACK: cookie token → direct Supabase lookup ──
+      if (!restoredStepData) {
         const cookieMatch = document.cookie.match(/fg_token=([^;]+)/);
-        if (cookieMatch) urlToken = decodeURIComponent(cookieMatch[1]);
-      }
-      if (!urlToken) {
-        try { urlToken = sessionStorage.getItem('fg_token') || ''; } catch(e) {}
-      }
-      // Clear the token after reading so it can't be reused
-      document.cookie = 'fg_token=; path=/; max-age=0';
-      try { sessionStorage.removeItem('fg_token'); } catch(e) {}
-      let rows = [];
-
-      if (urlToken) {
-        // Exact token lookup — most reliable
-        const r1 = await fetch(
-          'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(urlToken) + '&select=id,session_token,step_data,email,paid',
-          { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
-        );
-        rows = await r1.json();
-      }
-
-      // Fallback: get most recent unpaid session (last 4 hours)
-      if (!rows || rows.length === 0) {
-        const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
-        const r2 = await fetch(
-          'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?paid=eq.false&order=created_at.desc&limit=1&select=id,session_token,step_data,email&created_at=gte.' + encodeURIComponent(since),
-          { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
-        );
-        rows = await r2.json();
+        const urlToken = cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
+        document.cookie = 'fg_token=; path=/; max-age=0';
+        if (urlToken) {
+          const r = await fetch(
+            'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(urlToken) + '&select=session_token,step_data,email',
+            { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
+          );
+          const rows = await r.json();
+          if (rows && rows.length > 0) {
+            restoredStepData = rows[0].step_data;
+            restoredEmail = rows[0].email || '';
+            fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(urlToken),
+              { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
+            ).catch(() => {});
+          }
+        }
       }
 
-      if (!rows || rows.length === 0) {
-        console.error('No session found'); reportInternalError('Flagged', 'session_restore', 'No session found on paid=true return. Token: ' + urlToken, '');
+      if (!restoredStepData) {
+        reportInternalError('Flagged', 'session_restore', 'No session found. cs=' + cs, '');
         return;
       }
 
-      const row = rows[0];
       // Restore step data
-      Object.assign(stepData, row.step_data || {});
+      Object.assign(stepData, restoredStepData);
 
       // Restore email into all fields
-      const email = row.email || stepData.email || '';
-      if (email) {
-        stepData.email = email;
+      if (restoredEmail) {
+        stepData.email = restoredEmail;
         const flagEmailEl = document.getElementById('flagEmail');
-        if (flagEmailEl) flagEmailEl.value = email;
+        if (flagEmailEl) flagEmailEl.value = restoredEmail;
         const shareEmailEl = document.getElementById('shareEmail');
-        if (shareEmailEl) shareEmailEl.value = email;
+        if (shareEmailEl) shareEmailEl.value = restoredEmail;
       }
 
-      // Clean URL now that we have the session data safely
       window.history.replaceState({}, '', window.location.pathname);
-
-      // Mark session paid
-      await fetch(
-        'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(row.session_token),
-        { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
-      );
-
-      // Show loading animation then results
       document.getElementById('heroSection') && (document.getElementById('heroSection').style.display = 'none');
       document.getElementById('formSection').classList.remove('active');
       document.getElementById('loadScreen').classList.add('active');
       runLoadingThenShow();
 
-    } catch(e) { console.error('Session restore failed:', e); reportInternalError('Flagged', 'session_restore', e.message, ''); }
+    } catch(e) { reportInternalError('Flagged', 'session_restore', e.message, ''); }
   });
 
   function runLoadingThenShow() {
@@ -1332,16 +1294,8 @@
       reportInternalError('Flagged', 'session_save', e.message, email);
     }
 
-    // Store full step data in localStorage — guaranteed to survive cross-origin navigation
-    try {
-      localStorage.setItem('fg_token', token);
-      localStorage.setItem('fg_step_data', JSON.stringify(stepData));
-      localStorage.setItem('fg_email', email);
-    } catch(e) {}
-    // Cookie as secondary backup
+    // Cookie backup (in case cs param is unavailable)
     document.cookie = 'fg_token=' + encodeURIComponent(token) + '; path=/; max-age=7200; SameSite=Lax';
-    // sessionStorage as tertiary backup
-    try { sessionStorage.setItem('fg_token', token); } catch(e) {}
     const stripeUrl = 'https://buy.stripe.com/14A14nculbyLdjdcX06sw02'
       + '?prefilled_email=' + encodeURIComponent(email)
       + '&client_reference_id=' + encodeURIComponent(token)
