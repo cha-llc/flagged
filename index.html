@@ -1018,59 +1018,60 @@
     try {
       let restoredStepData = null;
       let restoredEmail = '';
+      let restoredToken = '';
 
-      // ── PRIMARY: use Stripe checkout session ID → server-side Supabase lookup ──
-      const cs = params.get('cs') || '';
-      if (cs) {
-        try {
-          const res = await fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/functions/v1/restore-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cs })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success) {
-              restoredStepData = data.step_data;
-              restoredEmail = data.email || '';
-            }
-          }
-        } catch(e) {}
-      }
+      // ── STEP 1: Get token from localStorage (most reliable — survives Stripe redirect) ──
+      try {
+        const lsToken = localStorage.getItem('fg_pending_token');
+        const lsTs = parseInt(localStorage.getItem('fg_pending_ts') || '0');
+        if (lsToken && (Date.now() - lsTs) < 7200000) restoredToken = lsToken;
+      } catch(e) {}
 
-      // ── FALLBACK: cookie/localStorage token → direct Supabase lookup ──
-      if (!restoredStepData) {
-        // Try cookie first, then localStorage (localStorage is more reliable across Stripe redirects)
+      // ── STEP 2: Cookie fallback ──
+      if (!restoredToken) {
         const cookieMatch = document.cookie.match(/fg_token=([^;]+)/);
-        let urlToken = cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
-        if (!urlToken) {
-          try {
-            const lsToken = localStorage.getItem('fg_pending_token');
-            const lsTs = parseInt(localStorage.getItem('fg_pending_ts') || '0');
-            if (lsToken && (Date.now() - lsTs) < 7200000) urlToken = lsToken;
-          } catch(e) {}
+        if (cookieMatch) restoredToken = decodeURIComponent(cookieMatch[1]);
+      }
+
+      // ── STEP 3: Clear stores so they can't be reused ──
+      try { localStorage.removeItem('fg_pending_token'); localStorage.removeItem('fg_pending_ts'); } catch(e) {}
+      document.cookie = 'fg_token=; path=/; max-age=0';
+
+      // ── STEP 4: Look up session by token ──
+      if (restoredToken) {
+        const r = await fetch(
+          'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(restoredToken) + '&select=session_token,step_data,email',
+          { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
+        );
+        const rows = await r.json();
+        if (rows && rows.length > 0) {
+          restoredStepData = rows[0].step_data;
+          restoredEmail = rows[0].email || '';
+          fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(restoredToken),
+            { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
+          ).catch(() => {});
         }
-        // Clear both stores
-        document.cookie = 'fg_token=; path=/; max-age=0';
-        try { localStorage.removeItem('fg_pending_token'); localStorage.removeItem('fg_pending_ts'); } catch(e) {}
-        if (urlToken) {
-          const r = await fetch(
-            'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(urlToken) + '&select=session_token,step_data,email',
-            { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
-          );
-          const rows = await r.json();
-          if (rows && rows.length > 0) {
-            restoredStepData = rows[0].step_data;
-            restoredEmail = rows[0].email || '';
-            fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(urlToken),
-              { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
-            ).catch(() => {});
-          }
+      }
+
+      // ── STEP 5: Final fallback — most recent unpaid session within last 4 hours ──
+      if (!restoredStepData) {
+        const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+        const r2 = await fetch(
+          'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?paid=eq.false&order=created_at.desc&limit=1&select=session_token,step_data,email&created_at=gte.' + encodeURIComponent(since),
+          { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
+        );
+        const rows2 = await r2.json();
+        if (rows2 && rows2.length > 0) {
+          restoredStepData = rows2[0].step_data;
+          restoredEmail = rows2[0].email || '';
+          fetch('https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(rows2[0].session_token),
+            { method: 'PATCH', headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ paid: true }) }
+          ).catch(() => {});
         }
       }
 
       if (!restoredStepData) {
-        reportInternalError('Flagged', 'session_restore', 'No session found. cs=' + cs, '');
+        reportInternalError('Flagged', 'session_restore', 'All restore strategies failed — token: ' + (restoredToken || 'none'), '');
         return;
       }
 
