@@ -1096,18 +1096,45 @@
   window.addEventListener('DOMContentLoaded', async () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('paid') !== 'true') return;
-
-    window.history.replaceState({}, '', window.location.pathname);
+    // Keep params available during async fetch — clean URL after restore completes
 
     try {
-      // Fetch the most recent unpaid session (created in last 2 hours)
-      const res = await fetch(
-        'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?paid=eq.false&order=created_at.desc&limit=1&select=id,session_token,step_data,email',
-        { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
-      );
-      const rows = await res.json();
+      // Strategy: look up by token param first (exact match), fall back to paid=eq.false
+      // Read token from cookie (survives Stripe redirect) or sessionStorage backup
+      let urlToken = params.get('t') || params.get('client_reference_id') || '';
+      if (!urlToken) {
+        const cookieMatch = document.cookie.match(/fg_token=([^;]+)/);
+        if (cookieMatch) urlToken = decodeURIComponent(cookieMatch[1]);
+      }
+      if (!urlToken) {
+        try { urlToken = sessionStorage.getItem('fg_token') || ''; } catch(e) {}
+      }
+      // Clear the token after reading so it can't be reused
+      document.cookie = 'fg_token=; path=/; max-age=0';
+      try { sessionStorage.removeItem('fg_token'); } catch(e) {}
+      let rows = [];
+
+      if (urlToken) {
+        // Exact token lookup — most reliable
+        const r1 = await fetch(
+          'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?session_token=eq.' + encodeURIComponent(urlToken) + '&select=id,session_token,step_data,email,paid',
+          { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
+        );
+        rows = await r1.json();
+      }
+
+      // Fallback: get most recent unpaid session (last 4 hours)
       if (!rows || rows.length === 0) {
-        console.error('No pending session found'); reportInternalError('Flagged', 'session_restore', 'No unpaid session found on paid=true return', '');
+        const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+        const r2 = await fetch(
+          'https://vzzzqsmqqaoilkmskadl.supabase.co/rest/v1/flagged_sessions?paid=eq.false&order=created_at.desc&limit=1&select=id,session_token,step_data,email&created_at=gte.' + encodeURIComponent(since),
+          { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json' } }
+        );
+        rows = await r2.json();
+      }
+
+      if (!rows || rows.length === 0) {
+        console.error('No session found'); reportInternalError('Flagged', 'session_restore', 'No session found on paid=true return. Token: ' + urlToken, '');
         return;
       }
 
@@ -1124,6 +1151,9 @@
         const shareEmailEl = document.getElementById('shareEmail');
         if (shareEmailEl) shareEmailEl.value = email;
       }
+
+      // Clean URL now that we have the session data safely
+      window.history.replaceState({}, '', window.location.pathname);
 
       // Mark session paid
       await fetch(
@@ -1256,12 +1286,30 @@
         headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6enpxc21xcWFvaWxrbXNrYWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjYzMjQsImV4cCI6MjA5MTQ0MjMyNH0.vYkiz5BeoJlhNzcEiiGQfsHLE5UfqJbTTBjNXk1xxJs', 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
         body: JSON.stringify({ session_token: token, email: email, step_data: stepData, paid: false })
       });
-      if (!saveRes.ok) console.error('Session save failed:', await saveRes.text());
-    } catch(e) { console.error('Session save error:', e); }
+      if (!saveRes.ok) {
+        const errText = await saveRes.text();
+        console.error('Session save failed:', errText);
+        reportInternalError('Flagged', 'session_save', 'HTTP ' + saveRes.status + ': ' + errText, email);
+        // Still redirect — session save failure will be caught on return
+      }
+    } catch(e) {
+      console.error('Session save error:', e);
+      reportInternalError('Flagged', 'session_save', e.message, email);
+    }
 
-    // Stripe success URL: getflagged.vercel.app?paid=true&cs={CHECKOUT_SESSION_ID}
-    // On return, DOMContentLoaded fetches most recent unpaid session and restores it
-    window.location.href = 'https://buy.stripe.com/14A14nculbyLdjdcX06sw02?utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis&utm_content=pay_button';
+    // Pass token in success URL so restore is exact — no guessing with paid=eq.false
+    // Stripe Payment Links support ?prefilled_email and client_reference_id via metadata
+    // We embed the token in the success URL directly using Stripe's {CHECKOUT_SESSION_ID} pattern
+    // Format: ?paid=true&t=TOKEN — on return we lookup by session_token directly
+    // Store token in cookie so it survives Stripe redirect (cookies persist across navigation)
+    document.cookie = 'fg_token=' + encodeURIComponent(token) + '; path=/; max-age=7200; SameSite=Lax';
+    // Also store in sessionStorage as backup (some browsers block cookies)
+    try { sessionStorage.setItem('fg_token', token); } catch(e) {}
+    const stripeUrl = 'https://buy.stripe.com/14A14nculbyLdjdcX06sw02'
+      + '?prefilled_email=' + encodeURIComponent(email)
+      + '&client_reference_id=' + encodeURIComponent(token)
+      + '&utm_source=flagged&utm_medium=web&utm_campaign=pattern_analysis';
+    window.location.href = stripeUrl;
   }
 
   function showFlags() {
